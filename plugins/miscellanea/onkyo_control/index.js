@@ -42,19 +42,22 @@ onkyoControl.prototype.onVolumioStart = function () {
 
         var commands = [];
 
-        if (self.currentState === 'play') {
+        if (self.action === 'powerOn') {
             if (self.config.get('powerOn')) {
-                commands.push('system-power=on');
+                commands.push('zone2.power=on');
             }
             if (self.config.get('setVolume') && !isNaN(self.config.get('setVolumeValue'))) {
-                commands.push('volume=' + self.config.get('setVolumeValue'));
+                commands.push('zone2.volume=' + self.config.get('setVolumeValue'));
             }
             if (self.config.get('setInput') && self.config.get('setInputValue')) {
-                commands.push('input-selector=' + self.config.get('setInputValue'));
+                commands.push('zone2.selector=' + self.config.get('setInputValue'));
             }
-        } else if (self.currentState === 'stop') {
-            commands.push('system-power=standby');
-        }
+        } else if (self.action === 'powerOff') {
+            commands.push('zone2.power=standby');
+        } else if (self.action === 'volume') {
+	    commands.push('zone2.volume=' + self.volume);
+	}
+
 
         commands.forEach(function (command, index, array) {
             self.logger.info("ONKYO-CONTROL:  eiscp.command('" + command + "')");
@@ -100,6 +103,12 @@ onkyoControl.prototype.onVolumioStart = function () {
 
             self.logger.debug("ONKYO-CONTROL: *********** ONKYO PLUGIN STATE CHANGE ********");
             self.logger.info("ONKYO-CONTROL: New state: " + JSON.stringify(state) + " connection: " + JSON.stringify(connectionOptions));
+            if (state.status === 'play' && self.volume !== state.volume) {
+		self.action = 'volumeChange';
+		self.volume = state.volume;
+		eiscp.connect(connectionOptions);
+	    }
+
             if (self.currentState && state.status !== self.currentState) {
 
                 if (state.status === 'play' && (
@@ -107,7 +116,7 @@ onkyoControl.prototype.onVolumioStart = function () {
                         || self.config.get('setVolume')
                         || self.config.get('setInput')
                     )) {
-                    
+                    self.action = 'powerOn';
                     clearTimeout(self.standbyTimout);
                     self.logger.debug("ONKYO-CONTROL: eiscp connecting... ");
                     eiscp.connect(connectionOptions);
@@ -116,6 +125,7 @@ onkyoControl.prototype.onVolumioStart = function () {
                     self.logger.info("ONKYO-CONTROL: Starting standby timeout: " + self.config.get('standbyDelay') + " seconds");
                     self.standbyTimout = setTimeout(function () {
                         self.logger.info("ONKYO-CONTROL: eiscp connecting... ");
+			self.action = 'powerOff';
                         eiscp.connect(connectionOptions);
                     }, self.config.get('standbyDelay') * 1000);
 
