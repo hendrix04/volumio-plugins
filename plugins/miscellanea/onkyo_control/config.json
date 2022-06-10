@@ -19,6 +19,10 @@
     "type": "string",
     "value": ""
   },
+  "zone" : {
+    "type": "string",
+    "value": "main"
+  },
   "powerOn": {
     "type": "boolean",
     "value": true

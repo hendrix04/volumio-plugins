@@ -1,46 +1,72 @@
-var libQ = require('kew');
-var fs = require('fs-extra');
-var config = new (require('v-conf'))();
-var exec = require('child_process').exec;
-var execSync = require('child_process').execSync;
+'use strict';
 
-var io = require('socket.io-client');
-var socket = io.connect('http://localhost:3000');
-var eiscp = require('eiscp');
+let libQ = require('kew');
+let fs = require('fs-extra');
+//let config = new (require('v-conf'))();
+//let exec = require('child_process').exec;
 
-var running = false;
-var currentState;
+let io = require('socket.io-client');
+let socket = io.connect('http://localhost:3000');
+let eiscp = require('eiscp');
 
 module.exports = onkyoControl;
 
 function onkyoControl(context) {
-    var self = this;
+    const self = this;
 
     this.context = context;
     this.commandRouter = this.context.coreCommand;
     this.logger = this.context.logger;
     this.configManager = this.context.configManager;
 
+    self.zoneList = ['main'];
+    self.receivers = {};
 }
 
 onkyoControl.prototype.onVolumioStart = function () {
-    var self = this;
-    var configFile = this.commandRouter.pluginManager.getConfigurationFile(this.context, 'config.json');
+    const self = this;
+    const configFile = this.commandRouter.pluginManager.getConfigurationFile(this.context, 'config.json');
     this.config = new (require('v-conf'))();
     self.logger.debug("ONKYO-CONTROL:  CONFIG FILE: " + configFile);
     this.config.loadFile(configFile);
 
+    self.load18nStrings();
+
+    return libQ.resolve();
+}
+
+onkyoControl.prototype.onStart = function () {
+    const self = this;
+    const defer = libQ.defer();
+
+    // Discover what receivers are available
+    eiscp.discover({timeout: 5}, function (err, results) {
+        if (err) {
+            self.logger.error("ONKYO-CONTROL: Error discovering receivers: " + results);
+        }
+        else {
+            self.logger.debug("ONKYO-CONTROL: Found these receivers on the local network: " + JSON.stringify(results));
+            results.forEach(function (receiver) {
+                self.receivers[receiver.mac] = {
+                    "host": receiver.host,
+                    "model": receiver.model,
+                    "mac": receiver.mac,
+                    "port": receiver.port
+                };
+            });
+        }
+    });
 
     eiscp.on('connect', function () {
         self.logger.info("ONKYO-CONTROL: eiscp connected ");
 
-        var disconnectCallback = function () {
+        const disconnectCallback = function () {
             self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect()");
             eiscp.disconnect();
             self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect() finished");
         };
 
-        var commands = [];
+        let commands = [];
 
         if (self.action === 'powerOn') {
             if (self.config.get('powerOn')) {
@@ -76,78 +102,65 @@ onkyoControl.prototype.onVolumioStart = function () {
     });
 
     socket.on('pushState', function (state) {
-        if (self.running) {
-            var connectionOptions = {
-                reconnect: false,
-                send_delay: 5000,
-                verify_commands: false
-            };
+        var connectionOptions = {
+            reconnect: false,
+            send_delay: 5000,
+            verify_commands: false
+        };
 
-            if (!self.config.get('autoDiscovery')) {
-                if (self.config.get('receiverPort') && self.config.get('receiverPort') !== '' && !isNaN(self.config.get('receiverPort'))) {
-                    connectionOptions.port = self.config.get('receiverPort');
-                    self.logger.debug("ONKYO-CONTROL: Overriding default connection port: " + JSON.stringify(connectionOptions));
-                }
-                if (self.config.get('receiverIP') && self.config.get('receiverIP') !== '') {
-                    connectionOptions.host = self.config.get('receiverIP');
-                    self.logger.debug("ONKYO-CONTROL: Overriding default connection host / ip: " + JSON.stringify(connectionOptions));
-                }
-                if (self.config.get('receiverModel') && self.config.get('receiverModel') !== '') {
-                    connectionOptions.model = self.config.get('receiverModel');
-                    self.logger.debug("ONKYO-CONTROL: Overriding receiver model: " + JSON.stringify(connectionOptions));
-                }
-            } else {
-                connectionOptions.port = 60128;
-                connectionOptions.host = '';
+        if (!self.config.get('autoDiscovery')) {
+            if (self.config.get('receiverPort') && self.config.get('receiverPort') !== '' && !isNaN(self.config.get('receiverPort'))) {
+                connectionOptions.port = self.config.get('receiverPort');
+                self.logger.debug("ONKYO-CONTROL: Overriding default connection port: " + JSON.stringify(connectionOptions));
             }
+            if (self.config.get('receiverIP') && self.config.get('receiverIP') !== '') {
+                connectionOptions.host = self.config.get('receiverIP');
+                self.logger.debug("ONKYO-CONTROL: Overriding default connection host / ip: " + JSON.stringify(connectionOptions));
+            }
+            if (self.config.get('receiverModel') && self.config.get('receiverModel') !== '') {
+                connectionOptions.model = self.config.get('receiverModel');
+                self.logger.debug("ONKYO-CONTROL: Overriding receiver model: " + JSON.stringify(connectionOptions));
+            }
+        }
+        else {
+            connectionOptions.port = 60128;
+            connectionOptions.host = '';
+        }
 
-            self.logger.debug("ONKYO-CONTROL: *********** ONKYO PLUGIN STATE CHANGE ********");
-            self.logger.info("ONKYO-CONTROL: New state: " + JSON.stringify(state) + " connection: " + JSON.stringify(connectionOptions));
-            if (state.status === 'play' && self.volume !== state.volume) {
-		self.action = 'volumeChange';
-		self.volume = state.volume;
-		eiscp.connect(connectionOptions);
+        self.logger.debug("ONKYO-CONTROL: *********** ONKYO PLUGIN STATE CHANGE ********");
+        self.logger.info("ONKYO-CONTROL: New state: " + JSON.stringify(state) + " connection: " + JSON.stringify(connectionOptions));
+        if (state.status === 'play' && self.volume !== state.volume) {
+            self.action = 'volumeChange';
+            self.volume = state.volume;
+            eiscp.connect(connectionOptions);
 	    }
 
             if (self.currentState && state.status !== self.currentState) {
 
-                if (state.status === 'play' && (
-                        self.config.get('powerOn') 
-                        || self.config.get('setVolume')
-                        || self.config.get('setInput')
-                    )) {
+                if (state.status === 'play'
+                    && (self.config.get('powerOn') || self.config.get('setVolume') || self.config.get('setInput'))
+                ) {
                     self.action = 'powerOn';
                     clearTimeout(self.standbyTimout);
                     self.logger.debug("ONKYO-CONTROL: eiscp connecting... ");
                     eiscp.connect(connectionOptions);
 
-                } else if (state.status === 'stop' && self.config.get('standby')) {
+                }
+                else if (state.status === 'stop' && self.config.get('standby')) {
                     self.logger.info("ONKYO-CONTROL: Starting standby timeout: " + self.config.get('standbyDelay') + " seconds");
                     self.standbyTimout = setTimeout(function () {
                         self.logger.info("ONKYO-CONTROL: eiscp connecting... ");
-			self.action = 'powerOff';
+		                self.action = 'powerOff';
                         eiscp.connect(connectionOptions);
                     }, self.config.get('standbyDelay') * 1000);
 
                 }
             }
             self.currentState = state.status;
-        }
-
     });
 
-
-    return libQ.resolve();
-}
-
-onkyoControl.prototype.onStart = function () {
-    var self = this;
-    var defer = libQ.defer();
-
-    self.load18nStrings();
-
-    self.running = true;
     self.logger.info("ONKYO-CONTROL: *********** ONKYO PLUGIN STARTED ********");
+    
     // Once the Plugin has successfull started resolve the promise
     defer.resolve();
 
@@ -166,12 +179,6 @@ onkyoControl.prototype.onStop = function () {
 
     return libQ.resolve();
 };
-
-onkyoControl.prototype.onRestart = function () {
-    var self = this;
-    // Optional, use if you need it
-};
-
 
 onkyoControl.prototype.getConfigurationFiles = function () {
     return ['config.json'];
@@ -198,69 +205,62 @@ onkyoControl.prototype.getUIConfig = function () {
             uiconf.sections[0].content[3].value = self.config.get('receiverPort');
             uiconf.sections[0].content[4].value = self.config.get('receiverModel');
 
-            uiconf.sections[1].content[0].value = self.config.get('powerOn', true);
-            uiconf.sections[1].content[1].value = self.config.get('setVolume', false);
-            uiconf.sections[1].content[2].value = self.config.get('setVolumeValue');
-            uiconf.sections[1].content[3].value = self.config.get('setInput', false);
-            uiconf.sections[1].content[5].value = self.config.get('standby', true);
-            uiconf.sections[1].content[6].value = self.config.get('standbyDelay');
+            uiconf.sections[1].content[0].value = self.config.get('zone', 'main');
+            uiconf.sections[1].content[1].value = self.config.get('powerOn', true);
+            uiconf.sections[1].content[2].value = self.config.get('setVolume', false);
+            uiconf.sections[1].content[3].value = self.config.get('setVolumeValue');
+            uiconf.sections[1].content[4].value = self.config.get('setInput', false);
+            uiconf.sections[1].content[6].value = self.config.get('standby', true);
+            uiconf.sections[1].content[7].value = self.config.get('standbyDelay');
 
-            eiscp.discover({timeout: 5}, function (err, results) {
-                if (err) {
-                    self.logger.error("ONKYO-CONTROL: Error discovering receivers: " + results);
-                } else {
-                    self.logger.debug("ONKYO-CONTROL: Found these receivers on the local network: " + JSON.stringify(results));
-                    results.forEach(function (receiver) {
-                        var option = {"value": receiver.host, "label": receiver.model};
-                        uiconf.sections[0].content[1].options.push(option);
+            for (const key in self.receivers) {
+                var option = {"value": self.receiver[key].host, "label": self.receiver[key].model};
+                uiconf.sections[0].content[1].options.push(option);
 
-                        if (receiver.host === self.config.get('receiverSelect')) {
-                            uiconf.sections[0].content[1].value = option;
-                        }
-                    });
+                if (self.receiver[key].host === self.config.get('receiverSelect')) {
+                    uiconf.sections[0].content[1].value = option;
                 }
-                if (!uiconf.sections[0].content[1].value) {
-                    uiconf.sections[0].content[1].value = {
-                        "value": "manual",
-                        "label": self.getI18nString("SELECT_RECEIVER_MANUAL")
-                    };
+            }
+
+            if (!uiconf.sections[0].content[1].value) {
+                uiconf.sections[0].content[1].value = {
+                    "value": "manual",
+                    "label": self.getI18nString("SELECT_RECEIVER_MANUAL")
+                };
+            }
+
+            if (self.receivers?.[0] !== 'undefined') {
+                
+            }
+
+            self.zoneList.forEach(function(zone) {
+                const option = {"value": zone, "label": zone};
+
+                uiconf.sections[1].content[0].options.push(option);
+
+                if (input === self.config.get('zone')) {
+                    uiconf.sections[1].content[0].value = option;
                 }
-                defer.resolve(uiconf);
             });
 
             eiscp.get_command('input-selector', function (err, results) {
                 results.forEach(function (input) {
-                    var option = {"value": input, "label": input};
-                    uiconf.sections[1].content[4].options.push(option);
+                    const option = {"value": input, "label": input};
+                    uiconf.sections[1].content[5].options.push(option);
 
                     if (input === self.config.get('setInputValue')) {
-                        uiconf.sections[1].content[4].value = option;
+                        uiconf.sections[1].content[5].value = option;
                     }
                 });
             });
 
+            defer.resolve(uiconf);
         })
         .fail(function () {
             defer.reject(new Error());
         });
 
     return defer.promise;
-};
-
-
-onkyoControl.prototype.setUIConfig = function (data) {
-    var self = this;
-    //Perform your installation tasks here
-};
-
-onkyoControl.prototype.getConf = function (varName) {
-    var self = this;
-    //Perform your installation tasks here
-};
-
-onkyoControl.prototype.setConf = function (varName, varValue) {
-    var self = this;
-    //Perform your installation tasks here
 };
 
 onkyoControl.prototype.saveConnectionConfig = function (data) {

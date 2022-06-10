@@ -99,6 +99,7 @@
       "saveButton": {
         "label": "TRANSLATE.SAVE",
         "data": [
+          "zone",
           "powerOn",
           "standby",
           "standbyDelay",
@@ -109,6 +110,18 @@
         ]
       },
       "content": [
+        {
+          "id": "zone",
+          "element": "select",
+          "label": "TRANSLATE.ZONE_INPUT_VAL",
+          "doc": "TRANSLATE.ZONE_INPUT_VAL_DOC",
+          "value": {"value": "main" ,"label": "main"},
+          "options": [],
+          "visibleIf": {
+            "field": "setInput",
+            "value": true
+          }
+        },
         {
           "id": "powerOn",
           "element": "switch",
