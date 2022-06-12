@@ -57,49 +57,7 @@ onkyoControl.prototype.onStart = function () {
         }
     });
 
-    eiscp.on('connect', function () {
-        self.logger.info("ONKYO-CONTROL: eiscp connected ");
-
-        const disconnectCallback = function () {
-            self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect()");
-            eiscp.disconnect();
-            self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect() finished");
-        };
-
-        let commands = [];
-
-        if (self.action === 'powerOn') {
-            if (self.config.get('powerOn')) {
-                commands.push('zone2.power=on');
-            }
-            if (self.config.get('setVolume') && !isNaN(self.config.get('setVolumeValue'))) {
-                commands.push('zone2.volume=' + self.config.get('setVolumeValue'));
-            }
-            if (self.config.get('setInput') && self.config.get('setInputValue')) {
-                commands.push('zone2.selector=' + self.config.get('setInputValue'));
-            }
-        } else if (self.action === 'powerOff') {
-            commands.push('zone2.power=standby');
-        } else if (self.action === 'volume') {
-	    commands.push('zone2.volume=' + self.volume);
-	}
-
-
-        commands.forEach(function (command, index, array) {
-            self.logger.info("ONKYO-CONTROL:  eiscp.command('" + command + "')");
-
-            if (index < array.length - 1) {
-                eiscp.command(command);
-            } else {
-                eiscp.command(command, disconnectCallback);
-            }
-        });
-
-    });
-
-    eiscp.on('error', function (error) {
-        self.logger.error("ONKYO-CONTROL:  An error occurred trying to comminicate with the receiver: " + error);
-    });
+    
 
     socket.on('pushState', function (state) {
         var connectionOptions = {
@@ -214,7 +172,7 @@ onkyoControl.prototype.getUIConfig = function () {
             uiconf.sections[1].content[7].value = self.config.get('standbyDelay');
 
             for (const key in self.receivers) {
-                var option = {"value": self.receiver[key].host, "label": self.receiver[key].model};
+                var option = {"value": self.receiver[key].host, "label": self.receiver[key].model + " : " + key};
                 uiconf.sections[0].content[1].options.push(option);
 
                 if (self.receiver[key].host === self.config.get('receiverSelect')) {
@@ -230,7 +188,7 @@ onkyoControl.prototype.getUIConfig = function () {
             }
 
             if (self.receivers?.[0] !== 'undefined') {
-                
+
             }
 
             self.zoneList.forEach(function(zone) {
@@ -275,12 +233,15 @@ onkyoControl.prototype.saveConnectionConfig = function (data) {
     if (data['receiverSelect'].value !== "manual") {
         self.config.set('receiverIP', data['receiverSelect'].value);
         self.config.set('receiverPort', '60128');
-    } else {
+    }
+    else {
         self.config.set('receiverIP', data['receiverIP']);
         self.config.set('receiverModel', data['receiverModel']);
+
         if (!data['receiverPort'] || data['receiverPort'] === '' || isNaN(data['receiverPort'])) {
             self.config.set('receiverPort', '60128');
-        } else {
+        }
+        else {
             self.config.set('receiverPort', data['receiverPort']);
         }
     }
@@ -304,7 +265,8 @@ onkyoControl.prototype.saveActionConfig = function (data) {
 
     if (data['standbyDelay'] <= 0) {
         self.config.set('standbyDelay', 0);
-    } else {
+    }
+    else {
         self.config.set('standbyDelay', data['standbyDelay']);
     }
 
@@ -312,14 +274,16 @@ onkyoControl.prototype.saveActionConfig = function (data) {
 
     if (data['setVolumeValue'] <= 0) {
         self.config.set('setVolumeValue', 0);
-    } else {
+    }
+    else {
         self.config.set('setVolumeValue', data['setVolumeValue']);
     }
 
     self.config.set('setInput', data['setInput']);
     if (data['setInputValue']) {
         self.config.set('setInputValue', data['setInputValue'].value);
-    } else {
+    }
+    else {
         self.config.set('setInputValue', 'line1');
     }
 
@@ -339,7 +303,8 @@ onkyoControl.prototype.load18nStrings = function () {
     try {
         var language_code = this.commandRouter.sharedVars.get('language_code');
         self.i18nStrings = fs.readJsonSync(__dirname + '/i18n/strings_' + language_code + ".json");
-    } catch (e) {
+    }
+    catch (e) {
         self.i18nStrings = fs.readJsonSync(__dirname + '/i18n/strings_en.json');
     }
 
@@ -349,8 +314,63 @@ onkyoControl.prototype.load18nStrings = function () {
 onkyoControl.prototype.getI18nString = function (key) {
     var self = this;
 
-    if (self.i18nStrings[key] !== undefined)
+    if (self.i18nStrings[key] !== undefined) {
         return self.i18nStrings[key];
-    else
+    }
+    else {
         return self.i18nStringsDefaults[key];
+    }
 };
+
+function callReceiver () {
+
+    return new Promise((resolve, reject) => {
+
+    
+        eiscp.on('connect', function () {
+            self.logger.info("ONKYO-CONTROL: eiscp connected ");
+
+            const disconnectCallback = function () {
+                self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect()");
+                eiscp.disconnect();
+                self.logger.debug("ONKYO-CONTROL:  eiscp.disconnect() finished");
+            };
+
+            let commands = [];
+
+            if (self.action === 'powerOn') {
+                if (self.config.get('powerOn')) {
+                    commands.push('zone2.power=on');
+                }
+                if (self.config.get('setVolume') && !isNaN(self.config.get('setVolumeValue'))) {
+                    commands.push('zone2.volume=' + self.config.get('setVolumeValue').toString(166));
+                }
+                if (self.config.get('setInput') && self.config.get('setInputValue')) {
+                    commands.push('zone2.selector=' + self.config.get('setInputValue'));
+                }
+            }
+            else if (self.action === 'powerOff') {
+                commands.push('zone2.power=standby');
+            }
+            else if (self.action === 'volume') {
+            commands.push('zone2.volume=' + self.volume.toString(16));
+        }
+
+
+            commands.forEach(function (command, index, array) {
+                self.logger.info("ONKYO-CONTROL:  eiscp.command('" + command + "')");
+
+                if (index < array.length - 1) {
+                    eiscp.command(command);
+                } else {
+                    eiscp.command(command, disconnectCallback);
+                }
+            });
+
+        });
+
+        eiscp.on('error', function (error) {
+            self.logger.error("ONKYO-CONTROL:  An error occurred trying to comminicate with the receiver: " + error);
+        });
+    })
+}
