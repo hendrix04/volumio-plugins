@@ -246,7 +246,6 @@ onkyoControl.prototype.saveConnectionConfig = function (data) {
         }
     }
 
-
     defer.resolve();
 
     self.commandRouter.pushToastMessage('success', self.getI18nString("SETTINGS_SAVED"), self.getI18nString("SETTINGS_SAVED_CONNECTION"));
@@ -287,7 +286,6 @@ onkyoControl.prototype.saveActionConfig = function (data) {
         self.config.set('setInputValue', 'line1');
     }
 
-
     defer.resolve();
 
     self.commandRouter.pushToastMessage('success', self.getI18nString("SETTINGS_SAVED"), self.getI18nString("SETTINGS_SAVED_ACTION"));
@@ -322,11 +320,10 @@ onkyoControl.prototype.getI18nString = function (key) {
     }
 };
 
-function callReceiver () {
+function callReceiver (args) {
 
     return new Promise((resolve, reject) => {
 
-    
         eiscp.on('connect', function () {
             self.logger.info("ONKYO-CONTROL: eiscp connected ");
 
