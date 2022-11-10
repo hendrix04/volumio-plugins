@@ -8,8 +8,31 @@ https://github.com/tillbaks/node-eiscp
 
 - Automatically or manually detect compatible Onkyo receivers on the network .
 - Send a power on or power off command to an Onkyo receiver when Volumio playback begins or ends.
+    - Pausing is equivilant to stopping a song.
+- Select the zone you want to listen on.
 - Set the volume on the receiver to a set value when Volumio playback begins.
+    - This also sets volumio's volume
+- Set receiver volume using Volumio's volume controls
 - Delay the power off command to the receiver (to allow for pausing music without shutting down).
+    - If a song starts playing again before the delayed power off kicks in, it will prevent the receiver from turning off.
+
+## Refactor enhancements
+Numerous enhancements have been made as of a major refactor done in 2022 by Hendrix04.
+I would like to thank Ben Mitchell (orderpftheflame) for giving a great base for me to start with.
+Had it not been for this plugin, I likely would have never picked up Volumio.
+
+- Updated to be compatible with the Volumio 3 pluigin store
+- Updated receiver information so that more receivers are compatible
+- Zone selection
+- More intelligent configuration page.
+    - Selecting a reciever and saving the Connection Configuration will populate the zone dropdown with appropriate zones.
+- Better volume support
+    - Max volume setting
+    - Volumio's volume is now appropriately relayed to the receiver.
+        - Example: The Spotify Connect plugin will now enable the Spotify app to control the reciever volume.
+- Better handling of power off
+    - Power off is now triggered via pause or stop
+    - If music is started back up after a pause or stop, but before the receiver is turned off (aka before the off delay runs out), then the reveiver will stay on.
 
 ## Installation
 
@@ -24,7 +47,7 @@ https://volumio.github.io/docs/User_Manual/SSH.html
 2. Connect via ssh using putty or the command line ```ssh volumio@volumio.local```
 3. Download and install the plugin using the following commands:
 ```
-git clone https://github.com/orderoftheflame/volumio-plugins.git
+git clone https://github.com/hendrix04/volumio-plugins.git
 cd volumio-plugins/plugins/miscellanea/onkyo_control
 npm install
 volumio plugin install
@@ -42,8 +65,12 @@ volumio plugin install
 - Receiver Model (Optional)
     - The model of receiver. This may be required with old receivers that do not support automatic discovery.
 ##### Action Configuration
+- Zone Selection
+    - Select which zone to power on
 - Power On
     - Power on the receiver when playback begins.
+- Maximum Volume
+    - Ensure that the reveiver never gets a command to go over a specific volume level.
 - Set Volume On Play
     - Set the volume of the receiver on playback start.
 - Volume Value
@@ -61,34 +88,7 @@ volumio plugin install
 ![Alt text](settings.png?raw=true "Settings and configuration")
 
 ## TODO
+There is nothing currently on the todo list. If someone has any suggestions, please [open an issue](https://github.com/hendrix04/volumio-plugins/issues).
 
-- [X] Implement power on when starting playback
-- [X] Implement power off when stopping playback
-- [X] Timeout when powering off (Wait X seconds for state to change to play, or power off)
-- [X] Config options (IP / Port with defaults, power off time, output channel)
-- [X] I18N
-- [X] Manual hostname / ip / port entry
-- [X] Discover receivers on the network for config option drop down
-- [X] Change receiver volume after power on
-- [X] Tidy logging
-- [X] Change receiver to "Line 1" channel after power on
-- [X] Input from dropdown
-- [ ] Prevent the power/volume/input command from being sent on track change (delay check for new state?)
-- [ ] Filter list of input channels to be more relevant
-- [ ] Improve host/ip config UI if possible
-
-## Known issues
-
-- [X] ~~Power off on song end~~
-- [X] ~~Toast i18n messages not working~~
-- [X] ~~Autolocate does not work after an incorrect host/ip has been attempted to be used.~~
-
-
-
-
-
-
-
-
-
-
+One of the original TODO items was to limit the input selection list based on receiver. This is not possible with current data.
+If someone wants to go through the effort of creating a mapping for all known receivers, I would be happy to incorporate it.

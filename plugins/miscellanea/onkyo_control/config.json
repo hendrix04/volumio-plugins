@@ -35,6 +35,10 @@
     "type": "int",
     "value": 5
   },
+  "maxVolume": {
+    "type": "int",
+    "value": 100
+  },
   "setVolume": {
     "type": "boolean",
     "value": false

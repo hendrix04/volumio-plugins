@@ -101,6 +101,7 @@
         "data": [
           "zone",
           "powerOn",
+          "maxVolume",
           "standby",
           "standbyDelay",
           "setVolume",
@@ -113,14 +114,10 @@
         {
           "id": "zone",
           "element": "select",
-          "label": "TRANSLATE.ZONE_INPUT_VAL",
-          "doc": "TRANSLATE.ZONE_INPUT_VAL_DOC",
+          "label": "TRANSLATE.ZONE_INPUT",
+          "doc": "TRANSLATE.ZONE_INPUT_DOC",
           "value": {"value": "main" ,"label": "main"},
-          "options": [],
-          "visibleIf": {
-            "field": "setInput",
-            "value": true
-          }
+          "options": []
         },
         {
           "id": "powerOn",
@@ -128,6 +125,14 @@
           "label": "TRANSLATE.POWER_ON",
           "doc": "TRANSLATE.POWER_ON_DOC",
           "value": true
+        },
+        {
+          "id": "maxVolume",
+          "type": "number",
+          "element": "input",
+          "label": "TRANSLATE.MAX_VOLUME",
+          "doc": "TRANSLATE.MAX_VOLUME_DOC",
+          "value": 100
         },
         {
           "id": "setVolume",
