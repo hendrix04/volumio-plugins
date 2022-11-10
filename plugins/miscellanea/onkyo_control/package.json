@@ -8,11 +8,27 @@
 	},
 	"author": "Ben Mitchell & Matthew Hendrix",
 	"license": "ISC",
+	"repository": "https://github.com/hendrix04/volumio-plugins.git",
 	"volumio_info": {
 		"prettyName": "Volumio Onkyo Control",
 		"icon": "fa-volume-up",
-		"plugin_type": "miscellanea"
+		"plugin_type": "system_hardware",
+		"architectures": [
+            "amd64",
+            "armhf",
+            "i386"
+        ],
+        "os": [
+            "buster"
+        ],
+		"has_alsa_contribution": false,
+		"details": "Controls Onkyo receivers via the local network.",
+		"changelog": "Refactored from Volumio 2 plugin."
 	},
+	"engines": {
+        "node": ">=8",
+        "volumio": ">=3"
+    },
 	"dependencies": {
 		"fs-extra": "^0.28.0",
 		"kew": "^0.7.0",

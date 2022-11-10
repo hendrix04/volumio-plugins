@@ -6,7 +6,6 @@ const fs = require('fs-extra');
 //let exec = require('child_process').exec;
 
 const io = require('socket.io-client');
-const socket = io.connect('http://localhost:3000');
 const eiscp = require('eiscp');
 
 module.exports = onkyoControl;
@@ -46,6 +45,7 @@ onkyoControl.prototype.onStart = function () {
     const self = this;
     const defer = libQ.defer();
 
+    self.socket = io.connect('http://localhost:3000');
     // Discover what receivers are available
     eiscp.discover({timeout: 5}, function (err, results) {
         if (err) {
@@ -86,7 +86,7 @@ onkyoControl.prototype.onStart = function () {
             eiscp.connect(self.connectionOptions);
 
             // Fire off a message to get an initial state back from the backend.
-            socket.emit("getState");
+            self.socket.emit("getState");
 
             // Since this is a callback and the rest of the on start is synchronous,
             // consider this the end of the start function.
@@ -99,7 +99,7 @@ onkyoControl.prototype.onStart = function () {
         self.logger.error("ONKYO-CONTROL:  An error occurred trying to comminicate with the receiver: " + error);
     });
 
-    socket.on('pushState', function (state) {
+    self.socket.on('pushState', function (state) {
 
         self.logger.debug("ONKYO-CONTROL: *********** ONKYO PLUGIN STATE CHANGE ********");
         self.logger.info("ONKYO-CONTROL: New state: " + JSON.stringify(state) + " connection: " + JSON.stringify(self.connectionOptions));
@@ -137,7 +137,7 @@ onkyoControl.prototype.onStart = function () {
                             // as well so that we can stay in sync. Typically
                             // after this first set, we shouldn't need to set
                             // it again.
-                            socket.emit("volume", self.volume);
+                            self.socket.emit("volume", self.volume);
 
                             self.callReceiver({
                                 "action": 'volume',
@@ -219,6 +219,7 @@ onkyoControl.prototype.onStop = function () {
     self.logger.info("ONKYO-CONTROL: *********** ONKYO PLUGIN STOPPED ********");
 
     eiscp.disconnect();
+    self.socket.disconnect();
 
     // Once the Plugin has successfull stopped resolve the promise
     defer.resolve();
